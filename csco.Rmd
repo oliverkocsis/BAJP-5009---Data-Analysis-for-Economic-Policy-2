@@ -3,7 +3,7 @@ title: "NASDAQ"
 output: html_document
 ---
 
-I chose Cisco Systems, Inc. (CSCO) from NASDAQ. This anyalaiss focuses on  close price and volume The data was downloaded from http://finance.yahoo.com/q/hp?s=CSCO+Historical+Prices on January 31, 2016. 
+I chose Cisco Systems, Inc. (CSCO) from NASDAQ. This analysis focuses on close price and volume. The data was downloaded from http://finance.yahoo.com/q/hp?s=CSCO+Historical+Prices on January 31, 2016.
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 library(data.table)
 library(ggplot2)
@@ -40,12 +40,12 @@ ggplot(cisco, aes(x = Date, y = Volume)) + geom_line() + ggtitle("Volume over ti
 
 # Close Price
 ## Stationarity
-The "Close price over time" charts seems to show the characteristirics of a random walk. But the Phillips-Perron test refuses with a high confidence the hypothesis that it has a unit root.
+The "Close price over time" charts seems to show the characteristics of a random walk. But the Phillips-Perron test rejects the hypothesis that it has a unit root with a high confidence.
 ```{r echo=FALSE, warning=FALSE}
 pander(PP.test(cisco$Close))
 ```
 
-Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the close price: taking the log difference results in a more stationary model. 
+Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the close price: taking the log difference results in a "more" stationary model. 
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Close.Log := log(Close)]
 cisco[, Close.Log.Diff := Close.Log - shift(Close.Log, n=1, fill=NA, type="lag")]
@@ -71,9 +71,10 @@ pander(df)
 ```
 
 ## Monday Effect
-Based on OLS with Newey-West SE using Monday dummy variable there is no evidence for Monday effect. 
+Based on OLS with Newey-West SE using Monday dummy variable there is no evidence for Monday effect when considering the close prices between 1990 and 2016.
 ```{r echo=FALSE, warning=FALSE}
-cisco[, Weekday.Monday := weekdays(Date) == "Monday"]
+cisco[, Weekday := weekdays(Date)]
+cisco[, Weekday.Monday := Weekday == "Monday"]
 fit <- lm(Close.Log.Diff ~ Weekday.Monday, data = cisco)
 se <- sqrt(diag(NeweyWest(fit)))
 df <- data.frame()
@@ -84,7 +85,7 @@ pander(df)
 ```
 
 ## Time Periods
-Based on the "Close price over time" chart there is a significant difference in price before and after March, 2000. According to [Market Crashes: The Dotcom Crash](the http://www.investopedia.com/features/crashes/crashes8.asp) article, The Nasdaq Composite lost 78% of its value as it fell from 5046.86 to 1114.11. 
+Based on the "Close price over time" chart there is a significant difference in close price before and after March, 2000. According to [Market Crashes: The Dotcom Crash](the http://www.investopedia.com/features/crashes/crashes8.asp) article, The Nasdaq Composite lost 78% of its value as it fell from 5046.86 to 1114.11. 
 ```{r echo=FALSE, warning=FALSE}
 dotcom <- as.Date("2000-03-11")
 cisco[, Dotcom.Before := Date <= dotcom ][,Dotcom.After := Date > dotcom]
@@ -93,12 +94,12 @@ ggplot(cisco, aes(x = Dotcom.After, y = Close)) + geom_boxplot()  + ggtitle("Var
 
 # Volume
 ## Stationarity
-The "Volume over time" charts seems to be stationary. Also, the Phillips-Perron test refuses with a high confidence the hypothesis that it has a unit root.
+The "Volume over time" charts seems to be stationary. Also, the Phillips-Perron test rejects the hypothesis that it has a unit root with a high confidence.
 ```{r echo=FALSE, warning=FALSE}
 pander(PP.test(as.numeric(cisco$Volume)))
 ```
 
-Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the volume: taking the log difference results in a more stationary model. 
+Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the volume: taking the log difference results in a "more" stationary model. 
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Volume.Log := log(Volume)]
 cisco[, Volume.Log.Diff := Volume.Log - shift(Volume.Log, n=1, fill=NA, type="lag")]
@@ -127,31 +128,81 @@ pander(model)
 ```
 
 ## Change in Trend
-Do you see a change in trend for the volume?
+Similarly to the close price, the Dotcom Crash had an effect on daily volumes as well. But this effect is not as significant as on the close price.
 
+```{r echo=FALSE, warning=FALSE}
+ggplot(cisco, aes(x = Dotcom.After, y = Volume)) + geom_boxplot()  + 
+  ggtitle("Variance of Close price before and after The Dotcom Crash") + theme_minimal()
+```
 
 # Regression
 
-Consider these two models
+(1) $E[ lnRS_{t} | lnRI_{t} ] = \alpha + \beta * RI_{t}$
 
-(1) E lnSIt
+(2) $E[ lnRS_{t} | lnRI_{t} ] = \alpha + \beta * RI_{t} + \gamma * t + sum ( O_{i} * s_{i} )$ 
 
-(2) E lnSIt
+where RS is the return of your stock, RI is the return of nasdaq composite, si are seasonal dummies.
 
-where RS is the return of your stock, RI is the return of nasdaq composite, si
+```{r echo=FALSE, warning=FALSE}
+# Add some seasonal dummies
+cisco[, Weekday.Tuesday := Weekday == "Tuesday"]
+cisco[, Weekday.Wednesday := Weekday == "Wednesday"]
+cisco[, Weekday.Thursday := Weekday == "Thursday"]
+# Download and calculate return on nasdaq composite
+src = "http://real-chart.finance.yahoo.com/table.csv?s=%5EIXIC&a=02&b=26&c=1990&d=00&e=29&f=2016&g=d&ignore=.csv"
+src = "nasdaq.csv"
+nasdaq <- read.csv(src, stringsAsFactors = FALSE)
+# Clean and Transform
+setDT(nasdaq)
+setkey(nasdaq, Date)
+cisco[, Nasdaq.Close := nasdaq$Close]
+cisco[, Nasdaq.Close.Log := log(Nasdaq.Close)]
+cisco[, Nasdaq.Close.Log.Diff := Nasdaq.Close.Log - shift(Nasdaq.Close.Log, n=1, fill=NA, type="lag")]
+```
 
-are seasonal dummies.
+## OLS model with Newey-West SE using 2 lags
+```{r echo=FALSE, warning=FALSE}
+cisco[, Nasdaq.Close.Log.Diff.lag.1 := shift(Nasdaq.Close.Log.Diff, n=1, fill=NA, type="lag")]
+cisco[, Nasdaq.Close.Log.Diff.lag.2 := shift(Nasdaq.Close.Log.Diff, n=2, fill=NA, type="lag")]
 
-1. Run an OLS regressions with newey-west SE with two lags for each 
+# Model 1
+model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff + Nasdaq.Close.Log.Diff.lag.1 +  Nasdaq.Close.Log.Diff.lag.2, data = cisco)
+se <- sqrt(diag(NeweyWest(model)))
+dt1 <- data.table(labels(model$coefficients))
+dt1 <- cbind(1:4, dt1, model$coefficients, se)
+colnames(dt1) <- c("i", "var", "Coefficients (1)", "Newey-West SE (1)")
 
-2. Present results in one table.
+model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff + Nasdaq.Close.Log.Diff.lag.1 + Nasdaq.Close.Log.Diff.lag.2 +
+               Date + Weekday.Monday + Weekday.Tuesday + Weekday.Wednesday + Weekday.Thursday, data = cisco)
+se <- sqrt(diag(NeweyWest(model)))
+dt2 <- data.table(labels(model$coefficients))
+dt2 <- cbind(1:9, dt2, model$coefficients, se)
+colnames(dt2) <- c("i", "var", "Coefficients (2)", "Newey-West SE (2)")
 
-3. Consider the first model. Interpret the β coefficient in words. What 
+dt <- merge(dt1, dt2, by = "var", all.y = TRUE)
+setorder(dt, i.y)
+dt[, i.x := NULL][, i.y := NULL]
+pander(dt, split.table = Inf)
+```
 
-4. For extra credit: repeat this with ARMA(2,2) and discuss stability of 
+## β coefficient 
+Consider the first model. Interpret the β coefficient in words. What economic/finance concept could you relate it to?
 
-models. 
+# Extra Credit: ARMA(2,2) 
+For extra credit: repeat this with ARMA(2,2) and discuss stability of results.
+## Autocorrelation Function
+```{r echo=FALSE, warning=FALSE}
+prices <- xts(cisco$Close.Log.Diff[-1], cisco$Date[-1])
+acf(prices)
+```
 
-economic/finance concept could you relate it to?
+## Partial Autocorrelation Function
+```{r echo=FALSE, warning=FALSE}
+pacf(prices)
+```
 
-results.
+## ARMA(2,2)  
+```{r echo=FALSE, warning=FALSE}
+model <- arima(prices, c(2,0,2))
+pander(model)
+```
