@@ -57,6 +57,7 @@ pander(PP.test(cisco$Close.Log.Diff[-1]))
 ```
 
 ## OLS model with Newey-West SE using 2 lags
+Based on OLS with Newey-West SE using 2 lags the returns can not be predicted. It is an evidence of Efficient Market Hypotheses.
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Close.Log.Diff.lag.1 := shift(Close.Log.Diff, n=1, fill=NA, type="lag")]
 cisco[, Close.Log.Diff.lag.2 := shift(Close.Log.Diff, n=2, fill=NA, type="lag")]
@@ -69,13 +70,26 @@ rownames(df) <- c("Coefficients", "Newey-West SE")
 pander(df)
 ```
 
-Based on OLS with Newey-West SE using 2 lags the returns can not be predicted. It is an evidence of Efficient Market Hypotheses
-
 ## Monday Effect
-Do you see evidence of Monday effect in returns?
+Based on OLS with Newey-West SE using Monday dummy variable there is no evidence for Monday effect. 
+```{r echo=FALSE, warning=FALSE}
+cisco[, Weekday.Monday := weekdays(Date) == "Monday"]
+fit <- lm(Close.Log.Diff ~ Weekday.Monday, data = cisco)
+se <- sqrt(diag(NeweyWest(fit)))
+df <- data.frame()
+df <- rbind(df,fit$coefficients,se)
+colnames(df) <- labels(fit$coefficients)
+rownames(df) <- c("Coefficients", "Newey-West SE")
+pander(df)
+```
 
-## Time Periods 
-Compare two time periods of your choice. Do you see any important  difference?
+## Time Periods
+Based on the "Close price over time" chart there is a significant difference in price before and after March, 2000. According to [Market Crashes: The Dotcom Crash](the http://www.investopedia.com/features/crashes/crashes8.asp) article, The Nasdaq Composite lost 78% of its value as it fell from 5046.86 to 1114.11. 
+```{r echo=FALSE, warning=FALSE}
+dotcom <- as.Date("2000-03-11")
+cisco[, Dotcom.Before := Date <= dotcom ][,Dotcom.After := Date > dotcom]
+ggplot(cisco, aes(x = Dotcom.After, y = Close)) + geom_boxplot()  + ggtitle("Variance of Close price before and after The Dotcom Crash") + theme_minimal()
+```
 
 # Volume
 ## Stationarity
