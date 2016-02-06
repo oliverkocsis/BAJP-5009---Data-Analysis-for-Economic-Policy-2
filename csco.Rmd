@@ -112,7 +112,7 @@ model <- arima(volumes, c(2,0,2))
 pander(model)
 ```
 
-## Chnage in Trend
+## Change in Trend
 Do you see a change in trend for the volume?
 
 
