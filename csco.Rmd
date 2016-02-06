@@ -1,0 +1,143 @@
+---
+title: "NASDAQ"
+output: html_document
+---
+
+I chose Cisco Systems, Inc. (CSCO) from NASDAQ. This anyalaiss focuses on  close price and volume The data was downloaded from http://finance.yahoo.com/q/hp?s=CSCO+Historical+Prices on January 31, 2016. 
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+library(data.table)
+library(ggplot2)
+library(pander)
+library(stats)
+library(xts)
+library(sandwich)
+
+# Open
+src = "http://real-chart.finance.yahoo.com/table.csv?s=CSCO&d=0&e=31&f=2016&g=d&a=2&b=26&c=1990&ignore=.csv"
+src = "csco.csv" # Comment this line in order to download the latest data from web
+cisco <- read.csv(src, stringsAsFactors = FALSE)
+# Clean and Transform
+setDT(cisco)
+setkey(cisco, Date)
+cisco[, Date := as.Date(Date)]
+cisco[, Open := NULL]
+cisco[, High := NULL]
+cisco[, Low := NULL]
+cisco[, Adj.Close := NULL]
+```
+
+# Data
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# Explore
+pander(summary(cisco))
+ggplot(cisco, aes(x = "Close", y = Close)) + geom_boxplot() + ggtitle("Variance of Close price") + theme_minimal()
+ggplot(cisco, aes(x = Close)) + geom_histogram() + ggtitle("Histogram of Close price") + theme_minimal()
+ggplot(cisco, aes(x = "Volume", y = Volume)) + geom_boxplot() + ggtitle("Variance of Volume") + theme_minimal()
+ggplot(cisco, aes(x = Volume)) + geom_histogram() + ggtitle("Histogram of Volume") + theme_minimal()
+ggplot(cisco, aes(x = Date, y = Close)) + geom_line() + ggtitle("Close price over time") + theme_minimal()
+ggplot(cisco, aes(x = Date, y = Volume)) + geom_line() + ggtitle("Volume over time") + theme_minimal()
+```
+
+# Close Price
+## Stationarity
+The "Close price over time" charts seems to show the characteristirics of a random walk. But the Phillips-Perron test refuses with a high confidence the hypothesis that it has a unit root.
+```{r echo=FALSE, warning=FALSE}
+pander(PP.test(cisco$Close))
+```
+
+Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the close price: taking the log difference results in a more stationary model. 
+```{r echo=FALSE, warning=FALSE}
+cisco[, Close.Log := log(Close)]
+cisco[, Close.Log.Diff := Close.Log - shift(Close.Log, n=1, fill=NA, type="lag")]
+ggplot(cisco, aes(x = Date, y = Close.Log.Diff)) + geom_line() + 
+  ggtitle("Log difference of Close price over time") + theme_minimal()
+```
+```{r echo=FALSE, warning=FALSE}
+pander(PP.test(cisco$Close.Log.Diff[-1]))
+```
+
+## OLS model with Newey-West SE using 2 lags
+```{r echo=FALSE, warning=FALSE}
+cisco[, Close.Log.Diff.lag.1 := shift(Close.Log.Diff, n=1, fill=NA, type="lag")]
+cisco[, Close.Log.Diff.lag.2 := shift(Close.Log.Diff, n=2, fill=NA, type="lag")]
+fit <- lm(Close.Log.Diff ~ Close.Log.Diff.lag.1 + Close.Log.Diff.lag.2, data = cisco)
+se <- sqrt(diag(NeweyWest(fit)))
+df <- data.frame()
+df <- rbind(df,fit$coefficients,se)
+colnames(df) <- labels(fit$coefficients)
+rownames(df) <- c("Coefficients", "Newey-West SE")
+pander(df)
+```
+
+Based on OLS with Newey-West SE using 2 lags the returns can not be predicted. It is an evidence of Efficient Market Hypotheses
+
+## Monday Effect
+Do you see evidence of Monday effect in returns?
+
+## Time Periods 
+Compare two time periods of your choice. Do you see any important  difference?
+
+# Volume
+## Stationarity
+The "Volume over time" charts seems to be stationary. Also, the Phillips-Perron test refuses with a high confidence the hypothesis that it has a unit root.
+```{r echo=FALSE, warning=FALSE}
+pander(PP.test(as.numeric(cisco$Volume)))
+```
+
+Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the volume: taking the log difference results in a more stationary model. 
+```{r echo=FALSE, warning=FALSE}
+cisco[, Volume.Log := log(Volume)]
+cisco[, Volume.Log.Diff := Volume.Log - shift(Volume.Log, n=1, fill=NA, type="lag")]
+ggplot(cisco, aes(x = Date, y = Volume.Log.Diff)) + geom_line() + 
+  ggtitle("Log difference of Volume over time") + theme_minimal()
+```
+```{r echo=FALSE, warning=FALSE}
+pander(PP.test(cisco$Volume.Log.Diff[-1]))
+```
+
+## Autocorrelation Function
+```{r echo=FALSE, warning=FALSE}
+volumes <- xts(cisco$Volume.Log.Diff[-1], cisco$Date[-1])
+acf(volumes)
+```
+
+## Partial Autocorrelation Function
+```{r echo=FALSE, warning=FALSE}
+pacf(volumes)
+```
+
+## ARMA(2,2)  
+```{r echo=FALSE, warning=FALSE}
+model <- arima(volumes, c(2,0,2))
+pander(model)
+```
+
+## Chnage in Trend
+Do you see a change in trend for the volume?
+
+
+# Regression
+
+Consider these two models
+
+(1) E lnSIt
+
+(2) E lnSIt
+
+where RS is the return of your stock, RI is the return of nasdaq composite, si
+
+are seasonal dummies.
+
+1. Run an OLS regressions with newey-west SE with two lags for each 
+
+2. Present results in one table.
+
+3. Consider the first model. Interpret the β coefficient in words. What 
+
+4. For extra credit: repeat this with ARMA(2,2) and discuss stability of 
+
+models. 
+
+economic/finance concept could you relate it to?
+
+results.
