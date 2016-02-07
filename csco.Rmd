@@ -141,7 +141,7 @@ ggplot(cisco, aes(x = Dotcom.After, y = Volume)) + geom_boxplot()  +
 
 (2) $E[ lnRS_{t} | lnRI_{t} ] = \alpha + \beta * RI_{t} + \gamma * t + sum ( O_{i} * s_{i} )$ 
 
-where RS is the return of your stock, RI is the return of nasdaq composite, si are seasonal dummies.
+where RS is the return of your stock, RI is the return of nasdaq composite, s are seasonal dummies.
 
 ```{r echo=FALSE, warning=FALSE}
 # Add some seasonal dummies
@@ -186,23 +186,26 @@ pander(dt, split.table = Inf)
 ```
 
 ## β coefficient 
-Consider the first model. Interpret the β coefficient in words. What economic/finance concept could you relate it to?
+The contemporaneous log difference of NASDAQ composite index has a significant coefficient of 1.317 considering the standard error of 0.03. But the first and second lags are not significant according to the OLS model. 
+Based on to the contemporaneous coefficient, one unit difference in the NASDAQ composite index is expected to result in 1.3 unit difference in the Cisco stock price. It means that whenever the NASDAQ composite index is 10 percentage points higher than the previous day, the Cisco is expected to close with 13 percentage points higher price. 
+The insignificance of the first and second lag is the evidence of Efficient Market Hypotheses. 
+The relative higher proportional increase of price could be explained by the relative strength of the Cisco stock. Cisco can be considered as a Blue-chip company. 
 
 # Extra Credit: ARMA(2,2) 
-For extra credit: repeat this with ARMA(2,2) and discuss stability of results.
-## Autocorrelation Function
+The ARMA model is built on the time series of the Cisco stock price.  The insignificance of the coefficients is the evidence of Efficient Market Hypotheses. 
+
 ```{r echo=FALSE, warning=FALSE}
 prices <- xts(cisco$Close.Log.Diff[-1], cisco$Date[-1])
+model <- arima(prices, c(2,0,2))
+pander(model)
+```
+
+## Autocorrelation Function
+```{r echo=FALSE, warning=FALSE}
 acf(prices)
 ```
 
 ## Partial Autocorrelation Function
 ```{r echo=FALSE, warning=FALSE}
 pacf(prices)
-```
-
-## ARMA(2,2)  
-```{r echo=FALSE, warning=FALSE}
-model <- arima(prices, c(2,0,2))
-pander(model)
 ```
