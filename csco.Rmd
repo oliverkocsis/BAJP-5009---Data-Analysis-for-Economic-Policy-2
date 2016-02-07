@@ -4,6 +4,7 @@ output: html_document
 ---
 
 I chose Cisco Systems, Inc. (CSCO) from NASDAQ. This analysis focuses on close price and volume. The data was downloaded from http://finance.yahoo.com/q/hp?s=CSCO+Historical+Prices on January 31, 2016.
+
 ```{r echo=FALSE, warning=FALSE, message=FALSE}
 library(data.table)
 library(ggplot2)
@@ -27,7 +28,8 @@ cisco[, Adj.Close := NULL]
 ```
 
 # Data
-```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width=3.5, fig.height=2.6}
 # Explore
 pander(summary(cisco))
 ggplot(cisco, aes(x = "Close", y = Close)) + geom_boxplot() + ggtitle("Variance of Close price") + theme_minimal()
@@ -41,11 +43,13 @@ ggplot(cisco, aes(x = Date, y = Volume)) + geom_line() + ggtitle("Volume over ti
 # Close Price
 ## Stationarity
 The "Close price over time" charts seems to show the characteristics of a random walk. But the Phillips-Perron test rejects the hypothesis that it has a unit root with a high confidence.
+
 ```{r echo=FALSE, warning=FALSE}
 pander(PP.test(cisco$Close))
 ```
 
 Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the close price: taking the log difference results in a "more" stationary model. 
+
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Close.Log := log(Close)]
 cisco[, Close.Log.Diff := Close.Log - shift(Close.Log, n=1, fill=NA, type="lag")]
@@ -58,6 +62,7 @@ pander(PP.test(cisco$Close.Log.Diff[-1]))
 
 ## OLS model with Newey-West SE using 2 lags
 Based on OLS with Newey-West SE using 2 lags the returns can not be predicted. It is an evidence of Efficient Market Hypotheses.
+
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Close.Log.Diff.lag.1 := shift(Close.Log.Diff, n=1, fill=NA, type="lag")]
 cisco[, Close.Log.Diff.lag.2 := shift(Close.Log.Diff, n=2, fill=NA, type="lag")]
@@ -72,6 +77,7 @@ pander(df)
 
 ## Monday Effect
 Based on OLS with Newey-West SE using Monday dummy variable there is no evidence for Monday effect when considering the close prices between 1990 and 2016.
+
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Weekday := weekdays(Date)]
 cisco[, Weekday.Monday := Weekday == "Monday"]
@@ -86,20 +92,23 @@ pander(df)
 
 ## Time Periods
 Based on the "Close price over time" chart there is a significant difference in close price before and after March, 2000. According to [Market Crashes: The Dotcom Crash](the http://www.investopedia.com/features/crashes/crashes8.asp) article, The Nasdaq Composite lost 78% of its value as it fell from 5046.86 to 1114.11. 
+
 ```{r echo=FALSE, warning=FALSE}
 dotcom <- as.Date("2000-03-11")
 cisco[, Dotcom.Before := Date <= dotcom ][,Dotcom.After := Date > dotcom]
-ggplot(cisco, aes(x = Dotcom.After, y = Close)) + geom_boxplot()  + ggtitle("Variance of Close price before and after The Dotcom Crash") + theme_minimal()
+ggplot(cisco, aes(x = Dotcom.After, y = Close)) + geom_boxplot()  + ggtitle("The Dotcom Crash of Close price") + theme_minimal()
 ```
 
 # Volume
 ## Stationarity
 The "Volume over time" charts seems to be stationary. Also, the Phillips-Perron test rejects the hypothesis that it has a unit root with a high confidence.
+
 ```{r echo=FALSE, warning=FALSE}
 pander(PP.test(as.numeric(cisco$Volume)))
 ```
 
 Although the original series can be accepted as stationary with high confidence, further improvements can be achieved via transforming the volume: taking the log difference results in a "more" stationary model. 
+
 ```{r echo=FALSE, warning=FALSE}
 cisco[, Volume.Log := log(Volume)]
 cisco[, Volume.Log.Diff := Volume.Log - shift(Volume.Log, n=1, fill=NA, type="lag")]
@@ -132,7 +141,7 @@ Similarly to the close price, the Dotcom Crash had an effect on daily volumes as
 
 ```{r echo=FALSE, warning=FALSE}
 ggplot(cisco, aes(x = Dotcom.After, y = Volume)) + geom_boxplot()  + 
-  ggtitle("Variance of Close price before and after The Dotcom Crash") + theme_minimal()
+  ggtitle("The Dotcom Crash of Volume") + theme_minimal()
 ```
 
 # Regression
