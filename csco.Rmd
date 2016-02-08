@@ -67,7 +67,7 @@ Based on OLS with Newey-West SE using 2 lags the returns can not be predicted. I
 cisco[, Close.Log.Diff.lag.1 := shift(Close.Log.Diff, n=1, fill=NA, type="lag")]
 cisco[, Close.Log.Diff.lag.2 := shift(Close.Log.Diff, n=2, fill=NA, type="lag")]
 fit <- lm(Close.Log.Diff ~ Close.Log.Diff.lag.1 + Close.Log.Diff.lag.2, data = cisco)
-se <- sqrt(diag(NeweyWest(fit)))
+se <- sqrt(diag(NeweyWest(fit, lag = 2)))
 df <- data.frame()
 df <- rbind(df,fit$coefficients,se)
 colnames(df) <- labels(fit$coefficients)
@@ -82,7 +82,7 @@ Based on OLS with Newey-West SE using Monday dummy variable there is no evidence
 cisco[, Weekday := weekdays(Date)]
 cisco[, Weekday.Monday := Weekday == "Monday"]
 fit <- lm(Close.Log.Diff ~ Weekday.Monday, data = cisco)
-se <- sqrt(diag(NeweyWest(fit)))
+se <- sqrt(diag(NeweyWest(fit, lag = 2)))
 df <- data.frame()
 df <- rbind(df,fit$coefficients,se)
 colnames(df) <- labels(fit$coefficients)
@@ -153,10 +153,6 @@ ggplot(cisco, aes(x = Dotcom.After, y = Volume)) + geom_boxplot()  +
 where RS is the return of your stock, RI is the return of nasdaq composite, s are seasonal dummies.
 
 ```{r echo=FALSE, warning=FALSE}
-# Add some seasonal dummies
-cisco[, Weekday.Tuesday := Weekday == "Tuesday"]
-cisco[, Weekday.Wednesday := Weekday == "Wednesday"]
-cisco[, Weekday.Thursday := Weekday == "Thursday"]
 # Download and calculate return on nasdaq composite
 src = "http://real-chart.finance.yahoo.com/table.csv?s=%5EIXIC&a=02&b=26&c=1990&d=00&e=29&f=2016&g=d&ignore=.csv"
 src = "nasdaq.csv"
@@ -171,21 +167,18 @@ cisco[, Nasdaq.Close.Log.Diff := Nasdaq.Close.Log - shift(Nasdaq.Close.Log, n=1,
 
 ## OLS model with Newey-West SE using 2 lags
 ```{r echo=FALSE, warning=FALSE}
-cisco[, Nasdaq.Close.Log.Diff.lag.1 := shift(Nasdaq.Close.Log.Diff, n=1, fill=NA, type="lag")]
-cisco[, Nasdaq.Close.Log.Diff.lag.2 := shift(Nasdaq.Close.Log.Diff, n=2, fill=NA, type="lag")]
-
 # Model 1
-model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff + Nasdaq.Close.Log.Diff.lag.1 +  Nasdaq.Close.Log.Diff.lag.2, data = cisco)
-se <- sqrt(diag(NeweyWest(model)))
+model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff, data = cisco)
+se <- sqrt(diag(NeweyWest(model, lag = 2)))
 dt1 <- data.table(labels(model$coefficients))
-dt1 <- cbind(1:4, dt1, model$coefficients, se)
+dt1 <- cbind(1:2, dt1, model$coefficients, se)
 colnames(dt1) <- c("i", "var", "Coefficients (1)", "Newey-West SE (1)")
 
-model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff + Nasdaq.Close.Log.Diff.lag.1 + Nasdaq.Close.Log.Diff.lag.2 +
-               Date + Weekday.Monday + Weekday.Tuesday + Weekday.Wednesday + Weekday.Thursday, data = cisco)
-se <- sqrt(diag(NeweyWest(model)))
+model <- lm(Close.Log.Diff ~ Nasdaq.Close.Log.Diff +
+               Date + Weekday.Monday + Dotcom.Before, data = cisco)
+se <- sqrt(diag(NeweyWest(model, lag = 2)))
 dt2 <- data.table(labels(model$coefficients))
-dt2 <- cbind(1:9, dt2, model$coefficients, se)
+dt2 <- cbind(1:5, dt2, model$coefficients, se)
 colnames(dt2) <- c("i", "var", "Coefficients (2)", "Newey-West SE (2)")
 
 dt <- merge(dt1, dt2, by = "var", all.y = TRUE)
@@ -195,26 +188,33 @@ pander(dt, split.table = Inf)
 ```
 
 ## β coefficient 
-The contemporaneous log difference of NASDAQ composite index has a significant coefficient of 1.317 considering the standard error of 0.03. But the first and second lags are not significant according to the OLS model. 
-Based on to the contemporaneous coefficient, one unit difference in the NASDAQ composite index is expected to result in 1.3 unit difference in the Cisco stock price. It means that whenever the NASDAQ composite index is 10 percentage points higher than the previous day, the Cisco is expected to close with 13 percentage points higher price. 
-The insignificance of the first and second lag is the evidence of Efficient Market Hypotheses. 
+The contemporaneous log difference of NASDAQ composite index has a significant coefficient of 1.318 considering the standard error of 0.026. It means that one unit difference in the NASDAQ composite index is expected to result in 1.3 unit difference in the Cisco stock price. So whenever the NASDAQ composite index is 10 percentage points higher than the previous day, the Cisco is expected to close with 13 percentage points higher price. 
+
 The relative higher proportional increase of price could be explained by the relative strength of the Cisco stock. Cisco can be considered as a Blue-chip company. 
 
 # Extra Credit: ARMA(2,2) 
-The ARMA model is built on the time series of the Cisco stock price.  The insignificance of the coefficients is the evidence of Efficient Market Hypotheses. 
-
-```{r echo=FALSE, warning=FALSE}
-prices <- xts(cisco$Close.Log.Diff[-1], cisco$Date[-1])
-model <- arima(prices, c(2,0,2))
-pander(model)
-```
+The ARMA model is built on the time series of the Cisco stock price. The insignificance of the coefficients is the evidence of Efficient Market Hypotheses. 
 
 ## Autocorrelation Function
 ```{r echo=FALSE, warning=FALSE}
+prices <- xts(cisco$Close.Log.Diff[-1], cisco$Date[-1])
 acf(prices)
 ```
 
 ## Partial Autocorrelation Function
 ```{r echo=FALSE, warning=FALSE}
 pacf(prices)
+```
+
+## Model (1)
+```{r echo=FALSE, warning=FALSE}
+
+model <- arima(prices, c(2,0,2), xreg = cisco[-1,.(Nasdaq.Close.Log.Diff)])
+pander(model)
+```
+
+## Model (2)
+```{r echo=FALSE, warning=FALSE}
+model <- arima(prices, c(2,0,2), xreg = cisco[-1,.(Nasdaq.Close.Log.Diff, Weekday.Monday, Dotcom.Before)])
+pander(model)
 ```
