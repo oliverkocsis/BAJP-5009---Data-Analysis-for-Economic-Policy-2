@@ -1,0 +1,12 @@
+library(XML)
+library(data.table)
+library(xts)
+
+# Sources are "http://www.federalreserve.gov/releases/h10/hist/dat00_mx.htm" and "http://www.federalreserve.gov/releases/h10/hist/dat96_mx.htm")
+# sources <- c("2016.csv", "1999.csv")
+usd_mxn <- read.csv("1999.csv", stringsAsFactors = FALSE, strip.white=TRUE)
+usd_mxn <- rbind(usd_mxn, read.csv("2016.csv", stringsAsFactors = FALSE, strip.white=TRUE))
+usd_mxn$Date <- as.Date(usd_mxn$Date, "%d-%b-%y")
+summary(usd_mxn)
+ts <- xts(usd_mxn$Rate, usd_mxn$Date)
+plot(ts)
