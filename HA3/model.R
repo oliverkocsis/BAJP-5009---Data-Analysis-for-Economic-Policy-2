@@ -2,10 +2,26 @@ library(XML)
 library(data.table)
 library(xts)
 
-# Sources are "http://www.federalreserve.gov/releases/h10/hist/dat00_mx.htm" and "http://www.federalreserve.gov/releases/h10/hist/dat96_mx.htm")
-# sources <- c("2016.csv", "1999.csv")
+# Banco de Mexico
 usd_mxn <- read.csv("usdmxn.csv", stringsAsFactors = FALSE, strip.white=TRUE)
-usd_mxn$Date <- as.Date(usd_mxn$Date, "%m/%d/%Y")
+setDT(usd_mxn)
+usd_mxn[, Date := as.Date(usd_mxn$Date, "%m/%d/%Y")]
 summary(usd_mxn)
-ts <- xts(usd_mxn$Rate, usd_mxn$Date)
-plot(ts)
+
+# NY.GDP.MKTP.KD	GDP (constant 2005 US$)
+# NY.GDP.PCAP.KD	GDP per capita (constant 2005 US$)
+gdp <- read.csv("mexico_data.csv", stringsAsFactors = FALSE, strip.white=TRUE)
+setDT(gdp)
+summary(gdp)
+
+# Merge yearly data
+usd_mxn[, Year := as.numeric(format(usd_mxn$Date,'%Y'))]
+usd_mxn[, Year_Close_Date := max(Date) ,by = Year]
+usd_mxn[Date == Year_Close_Date]
+
+data <- merge(usd_mxn[Date == Year_Close_Date, .(Year, Date, Rate)], gdp[, .(Year, NY.GDP.MKTP.KD, NY.GDP.PCAP.KD)], by = "Year")
+data <- data[Year < 2015]
+timeseries <- ts(data[, 3:5, with = FALSE], start = min(data$Year))
+
+plot(timeseries)
+plot(diff(timeseries))
