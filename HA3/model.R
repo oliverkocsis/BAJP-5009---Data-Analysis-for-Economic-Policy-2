@@ -92,8 +92,13 @@ plot(diff(timeseries))
 VARselect(diff(timeseries), lag.max=16, type="const")$selection
 
 #### Vector Autoregression ####
-var <- VAR(diff(timeseries), p=1, type="const")
-serial.test(var, lags.pt=1, type="PT.asymptotic")
+var <- VAR(diff(timeseries), p=4, type="const")
+serial.test(var, lags.pt=4, type="PT.asymptotic")
 summary(var)
 fcst <- forecast(var)
 plot(fcst, xlab="Year")
+irf <- irf(var)
+str(irf)
+plot(irf$irf$lnRate)
+acf(diff(timeseries))
+pacf(diff(timeseries))
