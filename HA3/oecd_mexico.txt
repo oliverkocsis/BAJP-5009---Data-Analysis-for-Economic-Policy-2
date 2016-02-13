@@ -1,0 +1,5 @@
+The OECD's quarterly national accounts (QNA) dataset presents data collected from all the OECD member countries and some other major economies on the basis of a standardised questionnaire as well as countries' own definitions and classifications. It contains a wide selection of generally seasonally adjusted quarterly series most widely used for economic analysis from 1960 or whenever available: 
+
+- GDP expenditure and output approaches (current prices and volume estimates); 
+
+https://stats.oecd.org/index.aspx?queryid=350#
