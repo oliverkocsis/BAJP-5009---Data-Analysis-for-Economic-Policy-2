@@ -75,7 +75,7 @@ data[, lnRate.Diff.Diff := lnRate.Diff - shift(lnRate.Diff, n=1, fill=NA, type="
 data[, lnValue.Diff.Diff := lnValue.Diff - shift(lnValue.Diff, n=1, fill=NA, type="lag")]
 
 
-lag.max <- 16
+lag.max <- 8
 # Standard
 summary <- data.table(i = 1:(lag.max + 2))
 formula <- "lnValue.Diff ~ lnRate.Diff"
@@ -108,7 +108,6 @@ for (lag in 1:lag.max) {
 rownames(summary)[1:3] <- c("Intercept", "Cumulative", "Contemporaneous")
 summary
 write.csv(summary, "dynamic.lags.csv")
-
 
 
 #### Vector Autoregression ####
