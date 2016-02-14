@@ -1,0 +1,19 @@
+"","i","Coefficients (16)","NeweyWest SE (16)"
+"(Intercept)",1,0.0127113131695302,0.00357015735751076
+"lnRate.Diff",2,0.0594896338045217,0.0881218112072708
+"shift(lnRate.Diff, n = 1, fill = NA, type = ""lag"")",3,-0.0859427336085633,0.0672866859421446
+"shift(lnRate.Diff, n = 2, fill = NA, type = ""lag"")",4,-0.0262434319752923,0.0729885857347495
+"shift(lnRate.Diff, n = 3, fill = NA, type = ""lag"")",5,0.00547392980299324,0.0479238493941292
+"shift(lnRate.Diff, n = 4, fill = NA, type = ""lag"")",6,0.134882735846968,0.0942422543943447
+"shift(lnRate.Diff, n = 5, fill = NA, type = ""lag"")",7,-0.00441643213778976,0.0454034866463261
+"shift(lnRate.Diff, n = 6, fill = NA, type = ""lag"")",8,0.129248435071261,0.0830500446085984
+"shift(lnRate.Diff, n = 7, fill = NA, type = ""lag"")",9,-0.025669178777352,0.0520979595386706
+"shift(lnRate.Diff, n = 8, fill = NA, type = ""lag"")",10,0.209704277986174,0.080695358515678
+"shift(lnRate.Diff, n = 9, fill = NA, type = ""lag"")",11,0.039845515682999,0.0493982779793663
+"shift(lnRate.Diff, n = 10, fill = NA, type = ""lag"")",12,0.0688741654575189,0.0919695821033973
+"shift(lnRate.Diff, n = 11, fill = NA, type = ""lag"")",13,-0.0484068131331101,0.0490507807835131
+"shift(lnRate.Diff, n = 12, fill = NA, type = ""lag"")",14,0.170420102435067,0.0853249345205117
+"shift(lnRate.Diff, n = 13, fill = NA, type = ""lag"")",15,0.0439802606269442,0.0557298348143563
+"shift(lnRate.Diff, n = 14, fill = NA, type = ""lag"")",16,-0.0138757875219064,0.0505643524839496
+"shift(lnRate.Diff, n = 15, fill = NA, type = ""lag"")",17,0.0300044734415572,0.0500232261900904
+"shift(lnRate.Diff, n = 16, fill = NA, type = ""lag"")",18,0.0651975271399257,0.0257841726687595

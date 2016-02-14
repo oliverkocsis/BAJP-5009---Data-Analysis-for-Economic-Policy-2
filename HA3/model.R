@@ -75,14 +75,13 @@ data[, lnRate.Diff.Diff := lnRate.Diff - shift(lnRate.Diff, n=1, fill=NA, type="
 data[, lnValue.Diff.Diff := lnValue.Diff - shift(lnValue.Diff, n=1, fill=NA, type="lag")]
 
 
-lag.max <- 8
+lag.max <- 16
 # Standard
 summary <- data.table(i = 1:(lag.max + 2))
 formula <- "lnValue.Diff ~ lnRate.Diff"
 for (lag in 1:lag.max) {
   formula <- paste(formula, " + shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
 }
-print(formula)
 fit <- lm(as.formula(formula), data = data)
 Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
 NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
@@ -91,21 +90,22 @@ colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyW
 summary <- merge(summary, s, by = "i", all.y  = TRUE)
 rownames(summary) <- rownames(data.frame(summary(fit)["coefficients"]))
 summary
-
+write.csv(summary, "lags.csv")
 
 # Commulative
 summary <- data.table(i = 1:(lag.max + 2))
-for (lag in 0:lag.max) {
-  formula <- paste("lnValue.Diff ~ shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+for (lag in 1:lag.max) {
+  formula <- paste(" lnValue.Diff ~  shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+  for (l in 0:(lag - 1)) {
+    formula <- paste(formula, " + shift(lnRate.Diff.Diff, n = ", l, ", fill=NA, type='lag')", sep = "")
+  }
   print(formula)
   fit <- lm(as.formula(formula), data = data)
-  Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
-  NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
-  s <- merge(Coefficients, NeweyWest.SE, by = "i")
+  s <- cbind(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1], NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
   colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
   summary <- merge(summary, s, by = "i", all.y  = TRUE)
 }
-rownames(summary) <- rownames(data.frame(summary(fit)["coefficients"]))
+rownames(summary)[1:3] <- c("Intercept", "Cumulative", "Contemporaneous")
 summary
 write.csv(summary, "dynamic.lags.csv")
 
