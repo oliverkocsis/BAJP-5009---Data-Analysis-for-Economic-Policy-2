@@ -4,6 +4,24 @@ library(xts)
 library(vars)
 library(forecast)
 
+diff(shift(1:10, type = "lag"))
+
+#### Functions
+explore.ts <- function(ts, lag = 0, difference = 0, title) {
+  if (lag > 0) {
+    ts <- diff(x = ts, lag = lag, differences = difference)
+  }
+  print(PP.test(ts))
+  fit <- stl(usd_mxn_quarter, t.window=4, s.window="periodic", robust=TRUE)
+  plot(fit,  main = title)
+  plot(usd_mxn_quarter, col="gray", main = title)
+  lines(fit$time.series[,2],col="red", ylab="Trend", main = title)
+  monthplot(fit$time.series[,"seasonal"], main="", ylab=title)
+  plot(forecast(fit, method="naive"), main = title)
+  Acf(ts, main = title)
+  Pacf(ts, main = title)
+}
+
 #### Data ####
 #### USD/MXN Exchnage Rate ####
 usd_mxn <- read.csv("usdmxn.csv", stringsAsFactors = FALSE, strip.white=TRUE)
@@ -21,31 +39,14 @@ usd_mxn[, Quarter_Close_Date := max(Date), by = Quarter]
 usd_mxn[, Year_Close := Date == Year_Close_Date]
 usd_mxn[, Quarter_Close := Date == Quarter_Close_Date]
 summary(usd_mxn)
+
 # Time series
 usd_mxn_quarter <- ts(usd_mxn[Quarter_Close == TRUE]$lnRate, start = c(1995, 1), frequency = 4)
-PP.test(usd_mxn_quarter)
-plot(usd_mxn_quarter, 
-     main = "Quarterly Exchnage Rate (USD/MXN)",
-     ylab = "Exchnage Rate (USD/MXN)")
-fit <- stl(usd_mxn_quarter, s.window=4)
-plot(usd_mxn_quarter, col="gray",
-     main="Trend of Quarterly Exchnage Rate (USD/MXN)",
-     ylab="Exchnage Rate (USD/MXN)")
-lines(fit$time.series[,2],col="red",ylab="Trend")
-
-PP.test(diff(usd_mxn_quarter))
-plot(diff(usd_mxn_quarter), 
-     main = "Difference in Quarterly Exchnage Rate (USD/MXN)",
-     ylab = "Exchnage Rate (USD/MXN)")
-PP.test(diff(usd_mxn_quarter, lag = 4))
-plot(diff(usd_mxn_quarter, lag = 4), 
-     main = "Year on Year differene in Quarterly Exchnage Rate (USD/MXN)",
-     ylab = "Exchnage Rate (USD/MXN)")
-
-plot(fit)
-plot(forecast(fit, method="naive"),
-     main="Forecast of Quarterly Exchnage Rate (USD/MXN)",
-     ylab="Exchnage Rate (USD/MXN)")
+for (lag in c(0, 1, 2, 4)) {
+  title <- paste("% Exchange Rate of USD/MXN (Δ on ", lag ,")", sep = "")
+  print(title)
+  explore.ts(usd_mxn_quarter, lag = lag, difference = 1, title = title)
+}
 
 #### GDP (Quarterly) ####
 oecd <- read.csv("oecd_mexico.csv", stringsAsFactors = FALSE, strip.white=TRUE)
@@ -60,45 +61,69 @@ str(oecd)
 summary(oecd)
 # Time series
 oecd_quarter <- ts(oecd$lnValue, start = c(1995, 1), frequency = 4)
-PP.test(oecd_quarter)
-plot(oecd_quarter, 
-     main = "Quarterly GDP (million Pesos)",
-     ylab = "Exchnage Rate (USD/MXN)")
-fit <- stl(oecd_quarter, s.window=4)
-plot(oecd_quarter, col="gray",
-     main="Trend of Quarterly GDP (million Pesos)",
-     ylab="Exchnage Rate (USD/MXN)")
-lines(fit$time.series[,2],col="red",ylab="Trend")
-
-PP.test(diff(oecd_quarter))
-plot(diff(oecd_quarter), 
-     main = "Difference in Quarterly GDP (million Pesos)",
-     ylab = "Exchnage Rate (USD/MXN)")
-PP.test(diff(oecd_quarter, lag = 4))
-plot(diff(oecd_quarter, lag = 4), 
-     main = "Year on Year differene in Quarterly GDP (million Pesos)",
-     ylab = "Exchnage Rate (USD/MXN)")
-
-plot(fit)
-plot(forecast(fit, method="naive"),
-     main="Forecast of Quarterly Exchnage Rate (USD/MXN)",
-     ylab="Exchnage Rate (USD/MXN)")
+for (lag in c(0, 1, 2, 4)) {
+  title <- paste("% GDP (Δ on ", lag ,")", sep = "")
+  print(title)
+  explore.ts(oecd_quarter, lag = lag, difference = 1, title = title)
+}
 
 #### Dynamic Lag Analysis ####
+data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
+data[, lnRate.Diff := lnRate - shift(lnRate, n=1, fill=NA, type="lag")]
+data[, lnValue.Diff := lnValue - shift(lnValue, n=1, fill=NA, type="lag")]
+data[, lnRate.Diff.Diff := lnRate.Diff - shift(lnRate.Diff, n=1, fill=NA, type="lag")]
+data[, lnValue.Diff.Diff := lnValue.Diff - shift(lnValue.Diff, n=1, fill=NA, type="lag")]
+
+
+lag.max <- 8
+# Standard
+summary <- data.table(i = 1:(lag.max + 2))
+formula <- "lnValue.Diff ~ lnRate.Diff"
+for (lag in 1:lag.max) {
+  formula <- paste(formula, " + shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+}
+print(formula)
+fit <- lm(as.formula(formula), data = data)
+Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
+NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
+s <- merge(Coefficients, NeweyWest.SE, by = "i")
+colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
+summary <- merge(summary, s, by = "i", all.y  = TRUE)
+rownames(summary) <- rownames(data.frame(summary(fit)["coefficients"]))
+summary
+
+
+# Commulative
+summary <- data.table(i = 1:(lag.max + 2))
+for (lag in 0:lag.max) {
+  formula <- paste("lnValue.Diff ~ shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+  print(formula)
+  fit <- lm(as.formula(formula), data = data)
+  Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
+  NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
+  s <- merge(Coefficients, NeweyWest.SE, by = "i")
+  colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
+  summary <- merge(summary, s, by = "i", all.y  = TRUE)
+}
+rownames(summary) <- rownames(data.frame(summary(fit)["coefficients"]))
+summary
+write.csv(summary, "dynamic.lags.csv")
+
+
+
+#### Vector Autoregression ####
 data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
 timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
 plot(timeseries)
 plot(diff(timeseries))
 VARselect(diff(timeseries), lag.max=16, type="const")$selection
-
-#### Vector Autoregression ####
 var <- VAR(diff(timeseries), p=4, type="const")
 serial.test(var, lags.pt=4, type="PT.asymptotic")
 summary(var)
 fcst <- forecast(var)
 plot(fcst, xlab="Year")
 irf <- irf(var)
-str(irf)
-plot(irf$irf$lnRate)
+summary(irf)
+plot(irf)
 acf(diff(timeseries))
 pacf(diff(timeseries))

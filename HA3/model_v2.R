@@ -1,11 +1,10 @@
 library(XML)
 library(data.table)
 library(xts)
-### !!! ###
-library(urca)
+library(vars)
+library(forecast)
 
-
-############## A Tompa Hülyeségei - start #####
+############## A Tompa H?lyes?gei - start #####
 
 set.seed(73)
 
@@ -14,127 +13,148 @@ Sys.setlocale(category = "LC_ALL", locale = "English_United States.1252")
 setwd("D:/Google Drive/Mikike/BusinessAnalytics/Tananyag/Data Analysis 2/HA/HA3/R/")
 source("D:/Google Drive/Mikike/BusinessAnalytics/Tananyag/Data Analysis 2/HA/HA2/NASDAQ/da_helper_functions.R")
 
-############## A Tompa Hülyeségei - stop #####
+############## A Tompa H?lyes?gei - stop #####
 
-
-############## Loading, Eyeballing, Engineering 
-
-# Banco de Mexico
+#### Data ####
+#### USD/MXN Exchnage Rate ####
 usd_mxn <- read.csv("usdmxn.csv", stringsAsFactors = FALSE, strip.white=TRUE)
 setDT(usd_mxn)
+str(usd_mxn)
+summary(usd_mxn)
+# Cleaning and transformation
 usd_mxn[, Date := as.Date(usd_mxn$Date, "%m/%d/%Y")]
+usd_mxn <- usd_mxn[Date >= as.Date("1995-01-01") & Date < as.Date("2015-09-01")]
+usd_mxn[, lnRate := log(Rate)]
+usd_mxn[, Year := as.numeric(format(usd_mxn$Date,'%Y'))]
+usd_mxn[, Quarter := as.yearqtr(Date)]
+usd_mxn[, Year_Close_Date := max(Date), by = Year]
+usd_mxn[, Quarter_Close_Date := max(Date), by = Quarter]
+usd_mxn[, Year_Close := Date == Year_Close_Date]
+usd_mxn[, Quarter_Close := Date == Quarter_Close_Date]
 summary(usd_mxn)
 
-# NY.GDP.MKTP.KD	GDP (constant 2005 US$)
-# NY.GDP.PCAP.KD	GDP per capita (constant 2005 US$)
-gdp <- read.csv("mexico_data.csv", stringsAsFactors = FALSE, strip.white=TRUE)
-setDT(gdp)
-summary(gdp)
 
-# Merge yearly data
-usd_mxn[, Year := as.numeric(format(usd_mxn$Date,'%Y'))]
-usd_mxn[, Year_Close_Date := max(Date) ,by = Year]
-usd_mxn[Date == Year_Close_Date]
+# Time series
+# First without ln...
+usd_mxn_quarter_bas <- ts(usd_mxn[Quarter_Close == TRUE]$Rate, start = c(1995, 1), frequency = 4)
+PP.test(usd_mxn_quarter_bas)
+str(PP.test(usd_mxn_quarter_bas))
 
-data <- merge(usd_mxn[Date == Year_Close_Date, .(Year, Date, Rate)], gdp[, .(Year, NY.GDP.MKTP.KD, NY.GDP.PCAP.KD)], by = "Year")
-data <- data[Year < 2015]
-timeseries <- ts(data[, 3:5, with = FALSE], start = min(data$Year))
-### !!! ###
-data$NY.GDP.MKTP.KD <- as.numeric(data$NY.GDP.MKTP.KD)
-data$NY.GDP.PCAP.KD <- as.numeric(data$NY.GDP.PCAP.KD)
+# as it was...
 
+usd_mxn_quarter <- ts(usd_mxn[Quarter_Close == TRUE]$lnRate, start = c(1995, 1), frequency = 4)
+PP.test(usd_mxn_quarter)
+plot(usd_mxn_quarter, 
+     main = "Quarterly Exchnage Rate (USD/MXN)",
+     ylab = "Exchnage Rate (USD/MXN)")
+fit <- stl(usd_mxn_quarter, s.window=4)
+plot(usd_mxn_quarter, col="gray",
+     main="Trend of Quarterly Exchnage Rate (USD/MXN)",
+     ylab="Exchnage Rate (USD/MXN)")
+lines(fit$time.series[,2],col="red",ylab="Trend")
+
+PP.test(diff(usd_mxn_quarter))
+plot(diff(usd_mxn_quarter), 
+     main = "Difference in Quarterly Exchnage Rate (USD/MXN)",
+     ylab = "Exchnage Rate (USD/MXN)")
+PP.test(diff(usd_mxn_quarter, lag = 4))
+plot(diff(usd_mxn_quarter, lag = 4), 
+     main = "Year on Year differene in Quarterly Exchnage Rate (USD/MXN)",
+     ylab = "Exchnage Rate (USD/MXN)")
+
+plot(fit)
+plot(forecast(fit, method="naive"),
+     main="Forecast of Quarterly Exchnage Rate (USD/MXN)",
+     ylab="Exchnage Rate (USD/MXN)")
+
+#### GDP (Quarterly) ####
+oecd <- read.csv("oecd_mexico.csv", stringsAsFactors = FALSE, strip.white=TRUE)
+setDT(oecd)
+str(oecd)
+summary(oecd)
+oecd <- oecd[LOCATION == "MEX" & SUBJECT == "B1_GA" & MEASURE == "CQR" & FREQUENCY == "Q", .(TIME, Unit, Unit.Code,  PowerCode, PowerCode.Code, Value)]
+oecd[, TIME := as.yearqtr(TIME, format = "%Y-Q%q")]
+oecd[, lnValue := log(Value)]
+oecd <- oecd[as.Date(TIME) >= as.Date("1995-01-01")]
+str(oecd)
+summary(oecd)
+# Time series
+# First without ln...
+oecd_quarter_bas <- ts(oecd$Value, start = c(1995, 1), frequency = 4)
+PP.test(oecd_quarter_bas)
+
+# as it was...
+
+oecd_quarter <- ts(oecd$lnValue, start = c(1995, 1), frequency = 4)
+PP.test(oecd_quarter)
+plot(oecd_quarter, 
+     main = "Quarterly GDP (million Pesos)",
+     ylab = "Exchnage Rate (USD/MXN)")
+fit <- stl(oecd_quarter, s.window=4)
+plot(oecd_quarter, col="gray",
+     main="Trend of Quarterly GDP (million Pesos)",
+     ylab="Exchnage Rate (USD/MXN)")
+lines(fit$time.series[,2],col="red",ylab="Trend")
+
+PP.test(diff(oecd_quarter))
+plot(diff(oecd_quarter), 
+     main = "Difference in Quarterly GDP (million Pesos)",
+     ylab = "Exchnage Rate (USD/MXN)")
+PP.test(diff(oecd_quarter, lag = 4))
+plot(diff(oecd_quarter, lag = 4), 
+     main = "Year on Year differene in Quarterly GDP (million Pesos)",
+     ylab = "Exchnage Rate (USD/MXN)")
+
+plot(fit)
+plot(forecast(fit, method="naive"),
+     main="Forecast of Quarterly Exchnage Rate (USD/MXN)",
+     ylab="Exchnage Rate (USD/MXN)")
+
+PPtest_dt=as.data.table(NULL)
+attr(PPtest_dt,"row.names") <- c("Data", "Ln_Data", "LogDiff_Data", "LogDiffLag4_Data")
+colnames(PPtest_dt) <- c("GDP", "Exchange_rate")
+
+
+
+
+#### Dynamic Lag Analysis ####
+data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
+data[, lnRate.Diff := lnRate - shift(lnRate, n=1, fill=NA, type="lag")]
+data[, lnValue.Diff := lnValue - shift(lnValue, n=1, fill=NA, type="lag")]
+timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
 plot(timeseries)
-plot(diff(timeseries))
+plot(diff(timeseries), plot.type="single", col=1:2, ylab="% change in rate and GDP", xlab = "Year")
+legend("topright", legend=c("Rate","GRP"), lty=1, col=c(1,2), cex=.9)
+fit <- lm(lnValue ~ lnRate + shift(lnRate, n = 1, type=c("lag")), data = timeseries)
+se <- sqrt(diag(NeweyWest(fit, lag = 2)))
+summary(fit)
+acf(fit$residuals)
+
+#### Vector Autoregression ####
+data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
+timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
+VARselect(diff(timeseries), lag.max=16, type="const")$selection
+var <- VAR(diff(timeseries), p=1, type="const")
+serial.test(var, lags.pt=1, type="PT.asymptotic")
+summary(var)
+fcst <- forecast(var)
+plot(fcst, xlab="Year")
+
+#### IRF #### 
+plot(irf(var, impulse = 'lnRate', response = 'lnValue', ortho = FALSE))
+plot(irf(var, impulse = 'lnValue', response = 'lnRate', ortho = FALSE))
+gdp_var_rate <- data[, .(dlnRate = diff(lnRate), dlnValue = diff(lnValue))]
+
+# lag1
+var1 <- VAR(gdp_var_rate, p = 1)
+plot(irf(var1, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
+plot(irf(var1, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
+
+#lag4
+var4 <- VAR(gdp_var_rate, p = 4)
+plot(irf(var4, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
+plot(irf(var4, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
 
 
-############## Unit roots, stationarity, etc. 
-############## 1) Rate
-
-pptRate <- ur.pp(data[,Rate], type = "Z-tau")
-
-pptRate
-pptRate@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptRate@teststat))
-
-# taking log
-
-data[,lnRate := log(Rate)]
-
-pptLnRate <- ur.pp(data[,lnRate], type = "Z-tau")
-
-pptLnRate
-pptLnRate@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptLnRate@teststat))
-
-
-# take log diffs
-data[, dlnRate := lnRate - lag(lnRate)]
-data$dlnRate[1] = 0
-
-pptDlnRate <- ur.pp(data[,dlnRate], type = "Z-tau")
-
-pptDlnRate
-pptDlnRate@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptDlnRate@teststat))
-
-
-
-############## 2) GDP MKTP
-
-pptGDPA <- ur.pp(data[,NY.GDP.MKTP.KD], type = "Z-tau")
-
-pptGDPA
-pptGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptGDPA@teststat))
-
-# taking log
-
-data[,lnNY.GDP.MKTP.KD := log(NY.GDP.MKTP.KD)]
-
-pptLnGDPA <- ur.pp(data[,lnNY.GDP.MKTP.KD], type = "Z-tau")
-
-pptLnGDPA
-pptLnGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptLnGDPA@teststat))
-### !!! log taking is satisfactory - no unit root
-
-# take log diffs
-data[, dlnNY.GDP.MKTP.KD := lnNY.GDP.MKTP.KD - lag(lnNY.GDP.MKTP.KD)]
-data$dlnNY.GDP.MKTP.KD[1] = 0
-
-pptDlnGDPA <- ur.pp(data[,dlnNY.GDP.MKTP.KD], type = "Z-tau")
-
-pptDlnGDPA
-pptDlnGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptDlnGDPA@teststat))
-
-
-
-############## 3) GDP PCAP
-
-pptGDPA <- ur.pp(data[,NY.GDP.PCAP.KD], type = "Z-tau")
-
-pptGDPA
-pptGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptGDPA@teststat))
-
-# taking log
-
-data[,lnNY.GDP.PCAP.KD := log(NY.GDP.PCAP.KD)]
-
-pptLnGDPA <- ur.pp(data[,lnNY.GDP.PCAP.KD], type = "Z-tau")
-
-pptLnGDPA
-pptLnGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptLnGDPA@teststat))
-
-# take log diffs
-data[, dlnNY.GDP.PCAP.KD := lnNY.GDP.PCAP.KD - lag(lnNY.GDP.PCAP.KD)]
-data$dlnNY.GDP.PCAP.KD[1] = 0
-
-pptDlnGDPA <- ur.pp(data[,dlnNY.GDP.PCAP.KD], type = "Z-tau")
-
-pptDlnGDPA
-pptDlnGDPA@cval
-cat("MacKinnon p-value for Z-tau: ", punitroot(pptDlnGDPA@teststat))
  
+
