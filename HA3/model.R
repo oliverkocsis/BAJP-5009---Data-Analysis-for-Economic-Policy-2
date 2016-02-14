@@ -116,13 +116,25 @@ timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
 plot(timeseries)
 plot(diff(timeseries))
 VARselect(diff(timeseries), lag.max=16, type="const")$selection
-var <- VAR(diff(timeseries), p=4, type="const")
-serial.test(var, lags.pt=4, type="PT.asymptotic")
+var <- VAR(diff(timeseries), p=1, type="const")
+serial.test(var, lags.pt=1, type="PT.asymptotic")
 summary(var)
 fcst <- forecast(var)
 plot(fcst, xlab="Year")
-irf <- irf(var)
-summary(irf)
-plot(irf)
-acf(diff(timeseries))
-pacf(diff(timeseries))
+
+#### IRF #### 
+plot(irf(var, impulse = 'lnRate', response = 'lnValue', ortho = FALSE))
+plot(irf(var, impulse = 'lnValue', response = 'lnRate', ortho = FALSE))
+gdp_var_rate <- data[, .(dlnRate = diff(lnRate), dlnValue = diff(lnValue))]
+
+# lag1
+var1 <- VAR(gdp_var_rate, p = 1)
+plot(irf(var1, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
+plot(irf(var1, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
+
+#lag4
+var4 <- VAR(gdp_var_rate, p = 4)
+plot(irf(var4, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
+plot(irf(var4, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
+
+causality(var1, cause = "dlnRate")

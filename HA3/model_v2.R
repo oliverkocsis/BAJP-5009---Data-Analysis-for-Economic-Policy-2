@@ -4,7 +4,7 @@ library(xts)
 library(vars)
 library(forecast)
 
-############## A Tompa H?lyes?gei - start #####
+############## A Tompa Hülyeségei - start #####
 
 set.seed(73)
 
@@ -13,7 +13,7 @@ Sys.setlocale(category = "LC_ALL", locale = "English_United States.1252")
 setwd("D:/Google Drive/Mikike/BusinessAnalytics/Tananyag/Data Analysis 2/HA/HA3/R/")
 source("D:/Google Drive/Mikike/BusinessAnalytics/Tananyag/Data Analysis 2/HA/HA2/NASDAQ/da_helper_functions.R")
 
-############## A Tompa H?lyes?gei - stop #####
+############## A Tompa Hülyeségei - stop #####
 
 #### Data ####
 #### USD/MXN Exchnage Rate ####
@@ -119,21 +119,12 @@ colnames(PPtest_dt) <- c("GDP", "Exchange_rate")
 
 #### Dynamic Lag Analysis ####
 data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
-data[, lnRate.Diff := lnRate - shift(lnRate, n=1, fill=NA, type="lag")]
-data[, lnValue.Diff := lnValue - shift(lnValue, n=1, fill=NA, type="lag")]
 timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
 plot(timeseries)
-plot(diff(timeseries), plot.type="single", col=1:2, ylab="% change in rate and GDP", xlab = "Year")
-legend("topright", legend=c("Rate","GRP"), lty=1, col=c(1,2), cex=.9)
-fit <- lm(lnValue ~ lnRate + shift(lnRate, n = 1, type=c("lag")), data = timeseries)
-se <- sqrt(diag(NeweyWest(fit, lag = 2)))
-summary(fit)
-acf(fit$residuals)
+plot(diff(timeseries))
+VARselect(diff(timeseries), lag.max=16, type="const")$selection
 
 #### Vector Autoregression ####
-data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
-timeseries <- ts(data[, .(lnRate, lnValue)], start = c(1995, 1), frequency = 4)
-VARselect(diff(timeseries), lag.max=16, type="const")$selection
 var <- VAR(diff(timeseries), p=1, type="const")
 serial.test(var, lags.pt=1, type="PT.asymptotic")
 summary(var)
@@ -155,6 +146,6 @@ var4 <- VAR(gdp_var_rate, p = 4)
 plot(irf(var4, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
 plot(irf(var4, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
 
-
+causality(var1, cause = "dlnRate")
  
 
