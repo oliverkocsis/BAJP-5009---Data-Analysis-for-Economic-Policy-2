@@ -79,17 +79,19 @@ lag.max <- 8
 # Standard
 summary <- data.table(i = 1:(lag.max + 2))
 formula <- "lnValue.Diff ~ lnRate.Diff"
-for (lag in 1:lag.max) {
-  formula <- paste(formula, " + shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+for (i in 1:lag.max){
+  for (lag in 1:i){
+    formula <- paste(formula, " + shift(lnRate.Diff, n = ", lag, ", fill=NA, type='lag')", sep = "")
+  }
+  fit <- lm(as.formula(formula), data = data)
+  Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
+  NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
+  s <- merge(Coefficients, NeweyWest.SE, by = "i")
+  colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
+  summary <- merge(summary, s, by = "i", all.y  = TRUE)
+  
 }
-fit <- lm(as.formula(formula), data = data)
-Coefficients <- data.table(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1])
-NeweyWest.SE <- data.table(i = 1:(lag + 2), NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
-s <- merge(Coefficients, NeweyWest.SE, by = "i")
-colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
-summary <- merge(summary, s, by = "i", all.y  = TRUE)
 rownames(summary) <- rownames(data.frame(summary(fit)["coefficients"]))
-summary
 write.csv(summary, "lags.csv")
 
 # Commulative
@@ -99,16 +101,13 @@ for (lag in 1:lag.max) {
   for (l in 0:(lag - 1)) {
     formula <- paste(formula, " + shift(lnRate.Diff.Diff, n = ", l, ", fill=NA, type='lag')", sep = "")
   }
-  print(formula)
   fit <- lm(as.formula(formula), data = data)
   s <- cbind(i = 1:(lag + 2), Coefficients = data.frame(summary(fit)["coefficients"])[,1], NeweyWest.SE = sqrt(diag(NeweyWest(fit, lag = lag))))
   colnames(s) <- c("i", paste("Coefficients (", lag, ")", sep = ""), paste("NeweyWest SE (", lag, ")", sep = ""))
   summary <- merge(summary, s, by = "i", all.y  = TRUE)
 }
 rownames(summary)[1:3] <- c("Intercept", "Cumulative", "Contemporaneous")
-summary
 write.csv(summary, "dynamic.lags.csv")
-
 
 #### Vector Autoregression ####
 data <- merge(usd_mxn[Quarter_Close == TRUE, .(Quarter, lnRate)], oecd[, .(TIME, lnValue)], by.x = "Quarter", by.y = "TIME")
@@ -123,6 +122,7 @@ fcst <- forecast(var)
 plot(fcst, xlab="Year")
 
 #### IRF #### 
+plot(irf(var))
 plot(irf(var, impulse = 'lnRate', response = 'lnValue', ortho = FALSE))
 plot(irf(var, impulse = 'lnValue', response = 'lnRate', ortho = FALSE))
 gdp_var_rate <- data[, .(dlnRate = diff(lnRate), dlnValue = diff(lnValue))]
@@ -131,10 +131,10 @@ gdp_var_rate <- data[, .(dlnRate = diff(lnRate), dlnValue = diff(lnValue))]
 var1 <- VAR(gdp_var_rate, p = 1)
 plot(irf(var1, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
 plot(irf(var1, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
+causality(var1, cause = "dlnRate")
 
 #lag4
 var4 <- VAR(gdp_var_rate, p = 4)
 plot(irf(var4, impulse = 'dlnRate', response = 'dlnValue', ortho = FALSE))
 plot(irf(var4, impulse = 'dlnValue', response = 'dlnRate', ortho = FALSE))
-
-causality(var1, cause = "dlnRate")
+causality(var4, cause = "dlnRate")
